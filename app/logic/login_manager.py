@@ -1,5 +1,5 @@
 """LoginManager (SEC-1, SEC-2, SEC-3). Every other manager calls require() first.
-TODO (Janae): 15-minute idle lock (SEC-3) in main.py using App.sign_out()."""
+The 15-minute idle lock (SEC-3) is app/logic/idle_lock.py, wired up in main.py."""
 import hashlib
 import hmac
 import os

@@ -44,6 +44,11 @@ class AddProductTests(unittest.TestCase):
         self.pm.add_product(self.mgr, "Zero", 0)             # boundary: 0 accepted
         self.assertEqual(self.count(), 1)
 
+    def test_zero_quantity_product_is_not_shown_as_in_stock(self):
+        pid = self.pm.add_product(self.mgr, "Empty", 0)
+        row = [r for r in self.pm.list_batches(self.mgr) if r["product_id"] == pid][0]
+        self.assertEqual(row["status"], "Out of Stock")
+
     def test_TS_1_3C_yesterday_rejected(self):
         with self.assertRaises(ValidationError) as e:
             self.pm.add_product(self.mgr, "Milk", 5, (TODAY - timedelta(days=1)).isoformat())

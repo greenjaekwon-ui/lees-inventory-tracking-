@@ -19,8 +19,4 @@ class ExpiryTimer:
             self._job = None
 
     def run_now(self):
-        try:
-            return self.stock.expire_overdue()
-        except NotImplementedError:
-            print("[ExpiryTimer] FID-11 is not built yet, so no stock was expired.")
-            return 0
+        return self.stock.expire_overdue()

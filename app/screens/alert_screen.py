@@ -1,5 +1,5 @@
 """AlertScreen (SDS 3.1). Low stock = FID-5 (Ricardo). Nearing expiry = FID-6 (Tevin).
-'Run expiry check now' triggers FID-11 (Janae) so you can see it work without waiting 24 hours."""
+'Run expiry check now' triggers FID-11 (Janae) so it can be shown without waiting 24 hours."""
 import tkinter as tk
 from tkinter import messagebox, ttk
 
@@ -18,7 +18,8 @@ class AlertScreen(ttk.Frame):
         self.low = self._table("Low-stock alerts (FID-5)",
                                (("name", "Product", 220), ("in_stock", "In Stock", 90), ("threshold", "Low-stock level", 120)))
         self.expiring = self._table("Nearing-expiry notifications (FID-6)",
-                                    (("name", "Product", 220), ("quantity", "Quantity", 90), ("expiry_date", "Expiry date", 120)))
+                                    (("name", "Product", 220), ("quantity", "Quantity", 90), ("expiry_date", "Expiry date", 120),
+                                     ("days_left", "Days left", 90)))
 
     def _table(self, title, columns):
         box = ttk.LabelFrame(self, text=title, padding=6)
@@ -31,18 +32,15 @@ class AlertScreen(ttk.Frame):
         tree.keys = [c[0] for c in columns]
         return tree
 
-    def _load(self, tree, fetch, placeholder):
+    def _load(self, tree, fetch):
         try:
             fill_table(tree, fetch(self.app.user), tree.keys)
-        except NotImplementedError:
-            tree.delete(*tree.get_children())
-            tree.insert("", "end", values=[placeholder] + [""] * (len(tree.keys) - 1))
         except Exception as exc:
             report_error(exc)
 
     def refresh(self):
-        self._load(self.low, self.app.alerts.low_stock_alerts, "(FID-5 not built yet - Ricardo)")
-        self._load(self.expiring, self.app.alerts.nearing_expiry_notifications, "(FID-6 not built yet - Tevin)")
+        self._load(self.low, self.app.alerts.low_stock_alerts)
+        self._load(self.expiring, self.app.alerts.nearing_expiry_notifications)
 
     def on_expiry_check(self):
         try:

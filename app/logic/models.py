@@ -34,14 +34,15 @@ class DamageReason(Enum):               # SRS FID-10 SR-10.2
     OTHER = "Other"
 
 
-# PROPOSED permissions (SRS Q9 and SDS 2.3.1 disagree): agree with the client.
+# Default permissions for this version (SRS 3.2.2 table, SDS 2.3.1). The client must still approve them.
+# Alerts (FID-5, FID-6) are shown to warehouse staff, inventory managers and the owner, not to cashiers (SR-6.3).
 ROLE_PERMISSIONS = {
     Role.INVENTORY_MANAGER: {"view_products", "add_product", "update_product", "remove_product",
                              "view_alerts", "record_damage", "run_expiry_check"},
     Role.OWNER:             {"view_products", "add_product", "update_product", "remove_product",
                              "view_alerts", "run_expiry_check"},
     Role.WAREHOUSE:         {"view_products", "view_alerts", "record_damage"},
-    Role.CASHIER:           {"view_products", "view_alerts"},
+    Role.CASHIER:           {"view_products"},
 }
 
 

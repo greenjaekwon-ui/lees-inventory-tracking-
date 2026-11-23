@@ -12,19 +12,20 @@ Demo logins: `manager`, `owner`, `warehouse`, `cashier` (password = name + `123`
 Demo products are dated from today so every boundary case works: Rice (low stock), Sugar (exactly at the
 threshold), Milk (10 days), Yogurt (exactly 30 days), Cheese (31 days), Butter (expires today), Juice (expired 2 days ago).
 
-## Who builds what (six features, one each)
+## Who built what (six features, one each)
 | Person | Feature | Edit ONLY these files | Status |
 |---|---|---|---|
 | Jaekwon | FID-1 Add Product, skeleton, database | `product_manager.py` (add_product), `product_screen.py` (add form), `database.py` | done |
-| Brandon | FID-3 Update Product | `product_manager.py` (update_product), `product_screen.py` (edit form), `tests/test_fid3_update_product.py` | TODO |
-| Ricardo | FID-5 Low-stock alert | `alert_manager.py` (low_stock_alerts), `alert_screen.py`, `tests/test_fid5_low_stock.py` | TODO |
-| Tevin | FID-6 Nearing-expiry notification | `alert_manager.py` (nearing_expiry_notifications), `tests/test_fid6_nearing_expiry.py` | TODO |
-| D'mitri | FID-10 Record Damage, BusinessRules | `stock_manager.py` (record_damage), `damage_screen.py`, `rules.py`, `tests/test_fid10_record_damage.py` | TODO |
-| Janae | FID-11 Expired status, login polish | `stock_manager.py` (expire_overdue), `expiry_timer.py`, `login_manager.py` (15-min idle lock), `tests/test_fid11_expired_status.py` | TODO |
+| Brandon | FID-3 Update Product | `product_manager.py` (update_product), `product_screen.py` (edit form), `tests/test_fid3_update_product.py` | done |
+| Ricardo | FID-5 Low-stock alert | `alert_manager.py` (low_stock_alerts), `alert_screen.py`, `tests/test_fid5_low_stock.py` | done |
+| Tevin | FID-6 Nearing-expiry notification | `alert_manager.py` (nearing_expiry_notifications), `tests/test_fid6_nearing_expiry.py` | done |
+| D'mitri | FID-10 Record Damage, BusinessRules | `stock_manager.py` (record_damage), `damage_screen.py`, `rules.py`, `tests/test_fid10_record_damage.py` | done |
+| Janae | FID-11 Expired status, login polish | `stock_manager.py` (expire_overdue), `expiry_timer.py`, `idle_lock.py` + `main.py` (15-min idle lock), `tests/test_fid11_expired_status.py`, `tests/test_idle_lock.py` | done |
 
-Each stub method has a docstring that lists the SRS requirements and the steps. Copy the pattern of `add_product`:
+All six features are implemented. Every manager method follows the same pattern as `add_product`:
 permission check -> validate -> apply rules -> ONE transaction -> audit log row.
-Each `tests/test_fid*.py` already has one test per SRS test scenario (skipped). Remove the `@unittest.skip` line and write the test as you go.
+Each `tests/test_fid*.py` has one test per SRS test scenario; the two marked "Manual (GUI)" in `test_fid10_record_damage.py` are checked by hand on the screen.
+Run everything with `python -m unittest` (shared set-up is in `tests/helpers.py`).
 
 ## Rules for everyone
 - Screens never contain rules. They call one manager and show the result.
@@ -55,4 +56,8 @@ Each `tests/test_fid*.py` already has one test per SRS test scenario (skipped). 
 
 ## Known limits
 - The tkinter screens were checked with a stand-in for tkinter, not on a real screen. Expect to fix small layout issues on first run.
-- Permissions per role are a proposal (`ROLE_PERMISSIONS` in `app/logic/models.py`). Confirm with the client.
+- Permissions per role are the defaults in `ROLE_PERMISSIONS` (`app/logic/models.py`), the same table as SRS 3.2.2 and SDS 2.3.1. The client must still approve them.
+- Built in this version: FID-1, 3, 5, 6, 10, 11 (+ login, 15-minute idle lock, audit log). Not built: FID-2, 4, 7, 8, 9, backups and file protection. They are designed in the SDS.
+- The 'Run expiry check now' button is a demo aid. The real check runs at start-up and every 24 hours.
+- Screen checks that need a real window (pop-up text, form values kept after an error, the edit dialog) are listed as manual tests in the Test Plan.
+- A damage entry larger than the first batch is taken from the batch that expires first, then the next one, and one damage record is saved per batch used.

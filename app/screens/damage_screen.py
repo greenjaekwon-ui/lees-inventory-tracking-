@@ -1,5 +1,4 @@
-"""DamageScreen (SDS 3.1) for FID-10 (D'mitri). The form is built; implement
-StockManager.record_damage and this screen works."""
+"""DamageScreen (SDS 3.1) for FID-10 (D'mitri)."""
 import tkinter as tk
 from tkinter import messagebox, ttk
 
@@ -39,14 +38,17 @@ class DamageScreen(ttk.Frame):
         self.product_box["values"] = list(self.product_ids)
 
     def on_record(self):
-        product_id = self.product_ids.get(self.product.get())      # None if nothing selected
+        name = self.product.get()
+        product_id = self.product_ids.get(name)                    # None if nothing selected
+        quantity = self.quantity.get().strip()
         try:
-            remaining = self.app.stock.record_damage(self.app.user, product_id, self.quantity.get(),
+            remaining = self.app.stock.record_damage(self.app.user, product_id, quantity,
                                                      self.reason.get(), self.note.get())
         except Exception as exc:
-            report_error(exc)
+            report_error(exc)                                      # the entered data stays on the form
             return
-        messagebox.showinfo("Saved", f"Damage recorded. Remaining In Stock: {remaining}")
+        messagebox.showinfo("Saved", f"Damage recorded for {name}: {quantity} unit(s).\n"
+                                     f"Remaining In Stock: {remaining}")
         self.quantity.set("")
         self.note.set("")
         self.refresh()

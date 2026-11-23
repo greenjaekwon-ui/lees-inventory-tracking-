@@ -30,3 +30,14 @@ class BusinessRules:
     def is_valid_new_expiry(cls, expiry, today):
         """FID-1 SR-1.3: today's date is accepted, earlier dates are rejected."""
         return expiry >= today
+
+    @staticmethod
+    def batch_status(in_stock_qty, last_to_status):
+        """Status shown for a batch: In Stock while usable units remain; otherwise the status its units
+        last moved to (Damaged, Expired or Sold); a batch that never had units shows 'Out of Stock'
+        (a flag, not one of the four statuses - FID-8 TS-8.1B)."""
+        if in_stock_qty > 0:
+            return "In Stock"
+        if last_to_status in ("Damaged", "Expired", "Sold"):
+            return last_to_status
+        return "Out of Stock"
