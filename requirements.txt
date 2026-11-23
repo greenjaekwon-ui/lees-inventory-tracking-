@@ -1,0 +1,2 @@
+# Standard library only (tkinter + sqlite3). Needs Python 3.10 or newer.
+# On Windows, tick "tcl/tk and IDLE" when installing Python from python.org.

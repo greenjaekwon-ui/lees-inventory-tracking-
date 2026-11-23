@@ -1,0 +1,58 @@
+# Lee's Wholesale Inventory Tracking System
+
+COMP2140 group WED_10-12_G05. Python 3.10+ with **tkinter** (screens) and **sqlite3** (storage). No installs needed.
+The code follows the layers in our SDS: `app/screens` (Screen layer), `app/logic` (Logic layer), `app/data` (Data layer).
+
+## Run it
+    python -m app.data.seed --demo      # once: creates the database with demo users and products
+    python main.py                      # sign in with manager / manager123
+    python -m unittest discover -s tests -t . -v      # run all tests
+
+Demo logins: `manager`, `owner`, `warehouse`, `cashier` (password = name + `123`).
+Demo products are dated from today so every boundary case works: Rice (low stock), Sugar (exactly at the
+threshold), Milk (10 days), Yogurt (exactly 30 days), Cheese (31 days), Butter (expires today), Juice (expired 2 days ago).
+
+## Who builds what (six features, one each)
+| Person | Feature | Edit ONLY these files | Status |
+|---|---|---|---|
+| Jaekwon | FID-1 Add Product, skeleton, database | `product_manager.py` (add_product), `product_screen.py` (add form), `database.py` | done |
+| Brandon | FID-3 Update Product | `product_manager.py` (update_product), `product_screen.py` (edit form), `tests/test_fid3_update_product.py` | TODO |
+| Ricardo | FID-5 Low-stock alert | `alert_manager.py` (low_stock_alerts), `alert_screen.py`, `tests/test_fid5_low_stock.py` | TODO |
+| Tevin | FID-6 Nearing-expiry notification | `alert_manager.py` (nearing_expiry_notifications), `tests/test_fid6_nearing_expiry.py` | TODO |
+| D'mitri | FID-10 Record Damage, BusinessRules | `stock_manager.py` (record_damage), `damage_screen.py`, `rules.py`, `tests/test_fid10_record_damage.py` | TODO |
+| Janae | FID-11 Expired status, login polish | `stock_manager.py` (expire_overdue), `expiry_timer.py`, `login_manager.py` (15-min idle lock), `tests/test_fid11_expired_status.py` | TODO |
+
+Each stub method has a docstring that lists the SRS requirements and the steps. Copy the pattern of `add_product`:
+permission check -> validate -> apply rules -> ONE transaction -> audit log row.
+Each `tests/test_fid*.py` already has one test per SRS test scenario (skipped). Remove the `@unittest.skip` line and write the test as you go.
+
+## Rules for everyone
+- Screens never contain rules. They call one manager and show the result.
+- Only `app/data/database.py` touches the data file. Pass values with `?` placeholders, never by joining strings into SQL.
+- Never store or print passwords. Quantities can never go negative. Related changes are saved in ONE `db.transaction()`.
+- Rules (30 days, low-stock, expiry) live only in `app/logic/rules.py`.
+
+## Working together on GitHub
+1. ONE person creates an empty repository (no README), adds everyone as collaborators, and pushes this folder:
+
+        git init -b main
+        git add .
+        git commit -m "Starter project"
+        git remote add origin https://github.com/<owner>/<repo>.git
+        git push -u origin main
+2. Everyone else: `git clone <repo-url>`
+3. Work on your own branch, and commit often:
+
+        git checkout -b fid5-low-stock
+        git add .
+        git commit -m "FID-5: low-stock alerts"
+        git pull --rebase origin main
+        git push -u origin fid5-low-stock
+   Then open a Pull Request on GitHub and merge it into `main` (or merge it yourself if you are the only one who touched those files).
+4. Before you start work each time: `git checkout main && git pull`.
+5. Final: tag the demo version so the marker sees exactly what we demo: `git tag final-submission && git push --tags`.
+   The submission PDF must link to this repository. It can't be changed after the demo.
+
+## Known limits
+- The tkinter screens were checked with a stand-in for tkinter, not on a real screen. Expect to fix small layout issues on first run.
+- Permissions per role are a proposal (`ROLE_PERMISSIONS` in `app/logic/models.py`). Confirm with the client.
