@@ -1,9 +1,12 @@
-"""ProductManager. FID-1 add (Jaekwon), FID-3 update (Brandon)."""
+"""ProductManager. FID-1 add (Jaekwon), FID-3 update (Brandon), FID-2 remove and FID-7 search."""
 import re
 from datetime import date, datetime
 
 from .errors import DuplicateProductError, ValidationError
 from .rules import BusinessRules
+
+
+STATUS_LABELS = ("In Stock", "Low Stock", "Out of Stock", "Sold", "Damaged", "Expired")   # FID-7 AC-7.1
 
 
 def _whole_number(value):
@@ -179,3 +182,84 @@ class ProductManager:
                       " VALUES ('update_product', ?, ?, ?)",
                       (f"{old_name}: " + "; ".join(changes), user.username, now))
         return True
+
+    # ---------- FID-2 Remove Product ----------
+    def removal_summary(self, user, product_id):
+        """What the confirmation prompt shows before a removal: product name and current quantity
+        (SR-2.3). Raises PermissionDenied (SR-2.1) or ValidationError if the product no longer exists (SR-2.2)."""
+        self.login.require(user, "remove_product")
+        row = self.db.query("SELECT id, name FROM product WHERE id = ? AND archived = 0", (product_id,))
+        if not row:
+            raise ValidationError({"product": "Product not found. It may already have been removed."})
+        qty = self.db.query("SELECT COALESCE(SUM(qty_in_stock), 0) AS n FROM stock_batch WHERE product_id = ?",
+                            (product_id,))[0]["n"]
+        return {"product_id": row[0]["id"], "name": row[0]["name"], "quantity": qty}
+
+    def remove_product(self, user, product_id, reason):
+        """Call this only after the user has confirmed in the prompt (SR-2.3). The product is archived, so it
+        disappears from the inventory, search and alerts, while its stock history and audit records stay
+        (SR-2.4). Returns the product name. Nothing changes if anything fails (SR-2.5)."""
+        info = self.removal_summary(user, product_id)                    # SR-2.1, SR-2.2
+        reason = (reason or "").strip()
+        if not reason:
+            raise ValidationError({"reason": "Enter a reason for removing the product."})
+        if len(reason) > 200:
+            raise ValidationError({"reason": "Reason must be 200 characters or fewer."})
+        now = datetime.now().isoformat(timespec="seconds")
+        with self.db.transaction() as c:                                 # SR-2.4, SAF-2
+            # the name is freed so the same name can be added again later; the original is kept in the log
+            c.execute("UPDATE product SET archived = 1, name = ? WHERE id = ?",
+                      (f"{info['name']} [removed #{product_id}]", product_id))
+            c.execute("INSERT INTO audit_log(action, detail, performed_by, date_time)"
+                      " VALUES ('remove_product', ?, ?, ?)",
+                      (f"{info['name']} ({info['quantity']} In Stock): {reason}", user.username, now))
+        return info["name"]
+
+    # ---------- FID-7 Search ----------
+    def search_products(self, user, name="", min_quantity=None, max_quantity=None, status=""):
+        """Find stock rows by product name (part of the name, any case), In Stock quantity range and/or
+        status label; any combination. Search text is only ever compared as text, never run as SQL (SEC-6).
+        Returns the same row dicts as list_batches(). An empty list means nothing matched (UC 07 A3).
+        Raises ValidationError if nothing was entered or an input is invalid."""
+        self.login.require(user, "view_products")
+        errors = {}
+        name = (name or "").strip()
+        status = (status or "").strip()
+        lo = hi = None
+        if str(min_quantity if min_quantity is not None else "").strip() != "":
+            lo = _whole_number(min_quantity)
+            if lo is None:
+                errors["min_quantity"] = "Enter a whole number of 0 or more."
+        if str(max_quantity if max_quantity is not None else "").strip() != "":
+            hi = _whole_number(max_quantity)
+            if hi is None:
+                errors["max_quantity"] = "Enter a whole number of 0 or more."
+        if status and status not in STATUS_LABELS:
+            errors["status"] = "Choose one of: " + ", ".join(STATUS_LABELS) + "."
+        if not errors and not (name or status or lo is not None or hi is not None):
+            errors["search"] = "Enter a product name, a quantity or a status to search."
+        if not errors and lo is not None and hi is not None and lo > hi:
+            errors["min_quantity"] = "The minimum cannot be greater than the maximum."
+        if errors:
+            raise ValidationError(errors)
+
+        rows = self.list_batches(user)
+        totals = {}
+        for r in rows:
+            totals[r["product_id"]] = totals.get(r["product_id"], 0) + r["qty_in_stock"]
+        found = []
+        for r in rows:
+            if name and name.lower() not in r["name"].lower():
+                continue
+            if lo is not None and r["qty_in_stock"] < lo:
+                continue
+            if hi is not None and r["qty_in_stock"] > hi:
+                continue
+            if status == "Low Stock":
+                total = totals[r["product_id"]]
+                if not (total > 0 and self.rules.is_low_stock(total, r["threshold"])):
+                    continue
+            elif status and r["status"] != status:
+                continue
+            found.append(r)
+        return found

@@ -22,7 +22,8 @@ threshold), Milk (10 days), Yogurt (exactly 30 days), Cheese (31 days), Butter (
 | D'mitri | FID-10 Record Damage, BusinessRules | `stock_manager.py` (record_damage), `damage_screen.py`, `rules.py`, `tests/test_fid10_record_damage.py` | done |
 | Janae | FID-11 Expired status, login polish | `stock_manager.py` (expire_overdue), `expiry_timer.py`, `idle_lock.py` + `main.py` (15-min idle lock), `tests/test_fid11_expired_status.py`, `tests/test_idle_lock.py` | done |
 
-All six features are implemented. Every manager method follows the same pattern as `add_product`:
+FID-2 (remove), FID-4 (stock changes), FID-7 (search), FID-8 (status), FID-9 (record a sale) and the backup were added on 25 Nov, so there are now tests for them too: `tests/test_fid2_remove_product.py`, `test_fid4_stock_change.py`, `test_fid7_search.py`, `test_fid8_status.py`, `test_fid9_record_sale.py`, `test_backup.py`.
+All eleven features are implemented. Every manager method follows the same pattern as `add_product`:
 permission check -> validate -> apply rules -> ONE transaction -> audit log row.
 Each `tests/test_fid*.py` has one test per SRS test scenario; the two marked "Manual (GUI)" in `test_fid10_record_damage.py` are checked by hand on the screen.
 Run everything with `python -m unittest` (shared set-up is in `tests/helpers.py`).
@@ -57,7 +58,7 @@ Run everything with `python -m unittest` (shared set-up is in `tests/helpers.py`
 ## Known limits
 - The tkinter screens were checked with a stand-in for tkinter, not on a real screen. Expect to fix small layout issues on first run.
 - Permissions per role are the defaults in `ROLE_PERMISSIONS` (`app/logic/models.py`), the same table as SRS 3.2.2 and SDS 2.3.1. The client must still approve them.
-- Built in this version: FID-1, 3, 5, 6, 10, 11 (+ login, 15-minute idle lock, audit log). Not built: FID-2, 4, 7, 8, 9, backups and file protection. They are designed in the SDS.
+- Built in this version: all eleven features, FID-1 to FID-11 (+ login, 15-minute idle lock, audit log, automatic backups). Backups go to the `backups` folder (newest 7 kept) at start-up and every 24 hours; managers and owners also have a 'Back up now' button. Protecting the data file itself is left to Windows file permissions (SEC-5), not the program.
 - The 'Run expiry check now' button is a demo aid. The real check runs at start-up and every 24 hours.
 - Screen checks that need a real window (pop-up text, form values kept after an error, the edit dialog) are listed as manual tests in the Test Plan.
 - A damage entry larger than the first batch is taken from the batch that expires first, then the next one, and one damage record is saved per batch used.

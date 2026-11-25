@@ -29,10 +29,11 @@ CREATE TABLE IF NOT EXISTS stock_change (
 );
 CREATE TABLE IF NOT EXISTS sale (
     id INTEGER PRIMARY KEY,
-    sale_ref TEXT NOT NULL UNIQUE,               -- a reused reference is rejected (SR-9.4)
+    sale_ref TEXT NOT NULL,                      -- a reused reference is rejected (SR-9.4)
     batch_id INTEGER NOT NULL REFERENCES stock_batch(id),
     quantity INTEGER NOT NULL CHECK (quantity > 0),
-    performed_by TEXT, date_time TEXT NOT NULL
+    performed_by TEXT, date_time TEXT NOT NULL,
+    UNIQUE (sale_ref, batch_id)
 );
 CREATE TABLE IF NOT EXISTS damage_record (
     id INTEGER PRIMARY KEY,

@@ -17,8 +17,12 @@ from app.screens.alert_screen import AlertScreen
 from app.screens.damage_screen import DamageScreen
 from app.screens.login_screen import LoginScreen
 from app.screens.product_screen import ProductScreen
+from app.screens.sale_screen import SaleScreen
+from app.screens.stock_screen import StockScreen
 
 DB_PATH = Path(__file__).with_name("lees_inventory.db")
+BACKUP_DIR = Path(__file__).with_name("backups")
+ONE_DAY_MS = 24 * 60 * 60 * 1000
 
 
 class App(tk.Tk):
@@ -39,7 +43,23 @@ class App(tk.Tk):
         for event in ("<Key>", "<Button>", "<Motion>"):      # any activity restarts the idle countdown
             self.bind_all(event, self.idle.reset, add="+")
         self.screens = []
+        self.auto_backup()                                   # SAF-3: at start-up, then every 24 hours
         self.show_login()
+
+    def auto_backup(self):
+        try:
+            self.db.backup(BACKUP_DIR)
+        except Exception as exc:                            # a failed backup must not stop the shop working
+            print("Backup failed:", exc)
+        self.after(ONE_DAY_MS, self.auto_backup)
+
+    def backup_now(self):
+        try:
+            path = self.db.backup(BACKUP_DIR)
+        except Exception as exc:
+            messagebox.showerror("Backup failed", str(exc))
+            return
+        messagebox.showinfo("Backup saved", f"A copy of the data was saved to:\n{path}")
 
     def _swap_body(self):
         if self.body is not None:
@@ -62,12 +82,16 @@ class App(tk.Tk):
         top.pack(fill="x", padx=10, pady=6)
         ttk.Label(top, text=f"Signed in as {user.username} ({user.role.value})").pack(side="left")
         ttk.Button(top, text="Sign out", command=self.sign_out).pack(side="right")
+        if user.has_permission("run_backup"):
+            ttk.Button(top, text="Back up now", command=self.backup_now).pack(side="right", padx=6)
 
         notebook = ttk.Notebook(body)
         notebook.pack(fill="both", expand=True, padx=10, pady=(0, 10))
         # each role only gets the tabs it may use (the managers still check permission on every call, SEC-1)
         wanted = (("Products", ProductScreen, "view_products"),
                   ("Record damage", DamageScreen, "record_damage"),
+                  ("Stock changes", StockScreen, "change_stock"),
+                  ("Record sale", SaleScreen, "record_sale"),
                   ("Alerts", AlertScreen, "view_alerts"))
         self.screens = []
         for title, screen_class, permission in wanted:
