@@ -19,8 +19,8 @@ class BusinessRules:
 
     @staticmethod
     def is_low_stock(in_stock_qty, threshold):
-        """Equal to or below the threshold (FID-5)."""
-        return in_stock_qty <= threshold
+        """Equal to or below the threshold (FID-5). A threshold of 0 means no threshold is set, so no alert."""
+        return bool(threshold) and in_stock_qty <= threshold
 
     @classmethod
     def can_sell(cls, in_stock_qty, qty, expiry, today):

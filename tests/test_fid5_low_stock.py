@@ -1,72 +1,83 @@
-"""FID-5 Low-stock alert (Ricardo). One test per SRS test scenario (TS-5.x).
-NOTE: the SRS wording of TS-5.1A/B and TS-5.3B talks about 'credentials' and 'errors'. These tests check
-what the feature actually does (who may see alerts, and that the quantities shown are accurate), so the
-SRS rows should be reworded to match - see the docstrings below."""
+"""FID-5 Low-stock alert (Ricardo). One test per SRS test scenario (TS-5.x), worded as in SRS v0.5."""
+import time
 import unittest
 
 from app.logic.errors import PermissionDenied
 from tests.helpers import Env
+
+RECEIVED = "Stock received"
 
 
 class Fid5LowStockTests(unittest.TestCase):
     def setUp(self):
         self.e = Env()
         self.addCleanup(self.e.close)
-        self.rice = self.e.add("Rice 5kg", 4, 5)        # below the level
-        self.sugar = self.e.add("Sugar 2kg", 3, 3)      # exactly at the level
-        self.flour = self.e.add("Flour 1kg", 50, 10)    # above the level
 
-    def names(self):
-        return {a["name"] for a in self.e.am.low_stock_alerts(self.e.mgr)}
+    def alerts(self):
+        return {a["name"]: a for a in self.e.am.low_stock_alerts(self.e.mgr)}
 
     def test_TS_5_1A(self):
-        """TS-5.1A [AC-5.1]: Verify that a signed-in user with permission (inventory manager, owner, warehouse staff) can view the low-stock alerts."""
-        for user in (self.e.mgr, self.e.owner, self.e.wh):
-            self.assertEqual(len(self.e.am.low_stock_alerts(user)), 2)
+        """TS-5.1A [AC-5.1]: Verify that a signed-in Warehouse / Stock Staff, Stock / Inventory Manager or Business Owner / Manager user can open the low-stock alert list."""
+        self.e.add("Rice 5kg", 4, 5)
+        for user in (self.e.wh, self.e.mgr, self.e.owner):
+            self.assertEqual(len(self.e.am.low_stock_alerts(user)), 1)
 
     def test_TS_5_1B(self):
-        """TS-5.1B [AC-5.1]: Verify that a user who is not signed in, or a sales/cashier user, cannot view the alerts and receives an access denied message."""
-        for user in (None, self.e.cash):
+        """TS-5.1B [AC-5.1]: Verify that a Sales / Cashier user, and a user who is not signed in, cannot open the list and receive an access denied message."""
+        for user in (self.e.cash, None):
             with self.assertRaises(PermissionDenied):
                 self.e.am.low_stock_alerts(user)
 
     def test_TS_5_2A(self):
-        """TS-5.2A [AC-5.2]: Verify that each alert shows the product name, In Stock quantity and low-stock level of the matching product."""
-        alert = [a for a in self.e.am.low_stock_alerts(self.e.mgr) if a["product_id"] == self.rice][0]
-        self.assertEqual((alert["name"], alert["in_stock"], alert["threshold"]), ("Rice 5kg", 4, 5))
+        """TS-5.2A [AC-5.2]: Verify that recording damage (FID-10) that takes a product's In Stock quantity to or below its threshold adds its alert within two seconds."""
+        pid = self.e.add("Rice 5kg", 10, 5)
+        self.assertNotIn("Rice 5kg", self.alerts())
+        start = time.time()
+        self.e.sm.record_damage(self.e.mgr, pid, 5, "Other")
+        found = self.alerts()
+        self.assertLess(time.time() - start, 2)
+        self.assertEqual((found["Rice 5kg"]["in_stock"], found["Rice 5kg"]["threshold"]), (5, 5))
 
     def test_TS_5_2B(self):
-        """TS-5.2B [AC-5.2]: Verify that 'Unknown Product' is listed when stock points at a product that does not exist."""
-        self.e.db.conn.execute("PRAGMA foreign_keys = OFF")
-        self.e.db.conn.execute("INSERT INTO stock_batch(product_id, qty_in_stock) VALUES (999, 2)")
-        self.e.db.conn.commit()
-        alerts = self.e.am.low_stock_alerts(self.e.mgr)
-        self.assertIn(("Unknown Product", 2), [(a["name"], a["in_stock"]) for a in alerts])
+        """TS-5.2B [AC-5.2]: Verify that raising a product's threshold above its quantity adds an alert, and lowering it below the quantity removes the alert, each within two seconds."""
+        pid = self.e.add("Rice 5kg", 10, 5)
+        start = time.time()
+        self.e.pm.update_product(self.e.mgr, pid, threshold="12")
+        self.assertIn("Rice 5kg", self.alerts())
+        self.e.pm.update_product(self.e.mgr, pid, threshold="3")
+        self.assertNotIn("Rice 5kg", self.alerts())
+        self.assertLess(time.time() - start, 2)
 
     def test_TS_5_3A(self):
-        """TS-5.3A [AC-5.3]: Verify that the quantity shown is the sum of In Stock units over all batches of the product."""
-        self.e.add_batch(self.rice, 1, 60)
-        alert = [a for a in self.e.am.low_stock_alerts(self.e.mgr) if a["product_id"] == self.rice][0]
-        self.assertEqual(alert["in_stock"], 5)
+        """TS-5.3A [AC-5.3]: Verify that a product with threshold 10 and In Stock quantity 10 is listed with the correct name, quantity and threshold (boundary)."""
+        self.e.add("Sugar 2kg", 10, 10)
+        a = self.alerts()["Sugar 2kg"]
+        self.assertEqual((a["in_stock"], a["threshold"]), (10, 10))
 
     def test_TS_5_3B(self):
-        """TS-5.3B [AC-5.3]: Verify that Sold, Damaged and Expired units are NOT counted in the quantity shown."""
-        self.e.db.conn.execute("UPDATE stock_batch SET qty_sold = 20, qty_damaged = 20, qty_expired = 20"
-                               " WHERE product_id = ?", (self.rice,))
-        self.e.db.conn.commit()
-        alert = [a for a in self.e.am.low_stock_alerts(self.e.mgr) if a["product_id"] == self.rice][0]
-        self.assertEqual(alert["in_stock"], 4)
+        """TS-5.3B [AC-5.3]: Verify that a product with threshold 10 and quantity 11, and a product with no threshold, are not listed."""
+        self.e.add("Flour 1kg", 11, 10)
+        self.e.add("Salt 1kg", 0, 0)
+        self.assertEqual(self.alerts(), {})
+
+    def test_TS_5_3C(self):
+        """TS-5.3C [AC-5.3]: Verify that a product with quantity 0 and a threshold set is listed."""
+        self.e.add("Oil 1L", 0, 5)
+        self.assertEqual(self.alerts()["Oil 1L"]["in_stock"], 0)
 
     def test_TS_5_4A(self):
-        """TS-5.4A [AC-5.4]: Verify that low-stock alerts are displayed when stock quantities meet or are below threshold."""
-        self.assertEqual(self.names(), {"Rice 5kg", "Sugar 2kg"})              # below AND exactly at the level
+        """TS-5.4A [AC-5.4]: Verify that receiving stock (FID-4) so the quantity rises above the threshold removes the alert with no user action."""
+        pid = self.e.add("Rice 5kg", 4, 5)
+        self.assertIn("Rice 5kg", self.alerts())
+        self.e.sm.change_stock(self.e.mgr, pid, RECEIVED, 10, "delivery")
+        self.assertNotIn("Rice 5kg", self.alerts())
 
     def test_TS_5_4B(self):
-        """TS-5.4B [AC-5.4]: Verify normal behaviour if quantities are above threshold (no alert; an alert clears after a top-up)."""
-        self.assertNotIn("Flour 1kg", self.names())
-        self.e.db.conn.execute("UPDATE stock_batch SET qty_in_stock = 6 WHERE product_id = ?", (self.rice,))
-        self.e.db.conn.commit()
-        self.assertNotIn("Rice 5kg", self.names())
+        """TS-5.4B [AC-5.4]: Verify that archiving a product that has an alert removes that alert and leaves alerts for other products unchanged."""
+        a = self.e.add("Rice 5kg", 4, 5)
+        self.e.add("Sugar 2kg", 3, 3)
+        self.e.pm.remove_product(self.e.mgr, a, "Discontinued")
+        self.assertEqual(set(self.alerts()), {"Sugar 2kg"})
 
 
 if __name__ == "__main__":
